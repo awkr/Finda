@@ -36,7 +36,7 @@
 
     CADisplayLink *displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(drawView:)];
     [displayLink addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];
-    
+
     [[UIDevice currentDevice] beginGeneratingDeviceOrientationNotifications];
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(didRotate:) name:UIDeviceOrientationDidChangeNotification object:nil];
 }
@@ -53,9 +53,9 @@
 }
 
 - (void)didRotate:(NSNotification *)notification {
-    // UIDeviceOrientation orientation = [[UIDevice currentDevice] orientation];
-    // _renderEngine->onRotate((DeviceOrientation) orientation);
-    // [self drawView:nil];
+    UIDeviceOrientation orientation = [[UIDevice currentDevice] orientation];
+    _renderEngine->onRotate((DeviceOrientation) orientation);
+    [self drawView:nil];
 }
 
 + (Class)layerClass {

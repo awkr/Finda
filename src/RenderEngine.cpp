@@ -46,7 +46,7 @@ void RenderEngine::initialize(unsigned int width, unsigned int height) {
     glGenBuffers(1, &_vertexBuffer);
     glBindBuffer(GL_ARRAY_BUFFER, _vertexBuffer);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-    
+
     // create VBO for the indices
     glGenBuffers(1, &_indexBuffer);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _indexBuffer);
@@ -78,15 +78,10 @@ void RenderEngine::render() const {
     glEnableVertexAttribArray(colorSlot);
 
     GLsizei stride = sizeof(Vertex);
-    // const GLvoid *positions = &(vertices[0].position);
-    // const GLvoid *colors = &(vertices[0].color);
-
     glVertexAttribPointer(positionSlot, 2, GL_FLOAT, GL_FALSE, stride, (GLvoid *) offsetof(Vertex, position));
     glVertexAttribPointer(colorSlot, 4, GL_FLOAT, GL_FALSE, stride, (GLvoid *) offsetof(Vertex, color));
 
-    // GLsizei vertexCount = sizeof(vertices) / sizeof(Vertex);
     glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_BYTE, nullptr);
-    // glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_BYTE, indices);
 
     glDisableVertexAttribArray(positionSlot);
     glDisableVertexAttribArray(colorSlot);
@@ -96,19 +91,19 @@ void RenderEngine::updateAnimation(float timeStep) {
 }
 
 void RenderEngine::onRotate(DeviceOrientation orientation) {
-    // float angle = 0;
-    // switch (orientation) {
-    //     case DeviceOrientation::LandscapeLeft:
-    //         angle = 270;
-    //         break;
-    //     case DeviceOrientation::LandscapeRight:
-    //         angle = 90;
-    //         break;
-    //     case DeviceOrientation::PortraitUpsideDown:
-    //         angle = 180;
-    //         break;
-    // }
-    // _currentAngle = angle;
+    float angle = 0;
+    switch (orientation) {
+        case DeviceOrientation::LandscapeLeft:
+            angle = 270;
+            break;
+        case DeviceOrientation::LandscapeRight:
+            angle = 90;
+            break;
+        case DeviceOrientation::PortraitUpsideDown:
+            angle = 180;
+            break;
+    }
+    _currentAngle = angle;
 }
 
 void RenderEngine::applyOrtho() const {
