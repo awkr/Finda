@@ -7,22 +7,28 @@
 
 #include "RenderEngine.hpp"
 #include <cmath>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <glm/gtx/string_cast.hpp>
 #include <iostream>
 #include <OpenGLES/ES3/gl.h>
 #include "SimpleVertexShader.h"
 #include "SimpleFragmentShader.h"
 
 struct Vertex {
-    float position[2];
-    float color[4];
+    glm::vec2 position;
+    glm::vec4 color;
 };
 
 // clang-format off
-const Vertex vertices[] = {
+const Vertex vertices[3] = {
         {{-0.5, -0.5}, {  1,   0, 0, 1}},
         {{ 0.5, -0.5}, {  0,   1, 0, 1}},
         {{   0,  0.5}, {  0,   0, 1, 1}},
 };
+
+GLubyte indices[3] = {0, 1, 2};
 // clang-format on
 
 RenderEngine::RenderEngine() {
@@ -36,6 +42,16 @@ void RenderEngine::initialize(unsigned int width, unsigned int height) {
     glBindFramebuffer(GL_FRAMEBUFFER, _framebuffer);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, _renderbuffer);
 
+    // create VBO for the vertices
+    glGenBuffers(1, &_vertexBuffer);
+    glBindBuffer(GL_ARRAY_BUFFER, _vertexBuffer);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    
+    // create VBO for the indices
+    glGenBuffers(1, &_indexBuffer);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _indexBuffer);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
     glViewport(0, 0, width, height);
 
     _simpleProgram = buildProgram(SimpleVertexShader, SimpleFragmentShader);
@@ -43,7 +59,7 @@ void RenderEngine::initialize(unsigned int width, unsigned int height) {
     glUseProgram(_simpleProgram);
 
     // initialize the projection matrix
-    applyOrtho(2, 3);
+    applyOrtho();
 
     // initialize rotation animation state
     onRotate(DeviceOrientation::Portrait);
@@ -52,30 +68,32 @@ void RenderEngine::initialize(unsigned int width, unsigned int height) {
 void RenderEngine::render() const {
     glClearColor(255.0f / 255.0f, 149.0f / 255.0f, 10.0f / 255.0f, 1.0f); // orange color
     glClear(GL_COLOR_BUFFER_BIT);
-    
+
     applyRotation(_currentAngle);
 
     auto positionSlot = glGetAttribLocation(_simpleProgram, "position");
     auto colorSlot = glGetAttribLocation(_simpleProgram, "color");
-    
+
     glEnableVertexAttribArray(positionSlot);
     glEnableVertexAttribArray(colorSlot);
-    
+
     GLsizei stride = sizeof(Vertex);
-    const GLvoid *positions = &(vertices[0].position[0]);
-    const GLvoid *colors = &(vertices[0].color[0]);
-    
-    glVertexAttribPointer(positionSlot, 2, GL_FLOAT, GL_FALSE, stride, positions);
-    glVertexAttribPointer(colorSlot, 4, GL_FLOAT, GL_FALSE, stride, colors);
-    
-    GLsizei vertexCount = sizeof(vertices) / sizeof(Vertex);
-    glDrawArrays(GL_TRIANGLES, 0, vertexCount);
-    
+    // const GLvoid *positions = &(vertices[0].position);
+    // const GLvoid *colors = &(vertices[0].color);
+
+    glVertexAttribPointer(positionSlot, 2, GL_FLOAT, GL_FALSE, stride, (GLvoid *) offsetof(Vertex, position));
+    glVertexAttribPointer(colorSlot, 4, GL_FLOAT, GL_FALSE, stride, (GLvoid *) offsetof(Vertex, color));
+
+    // GLsizei vertexCount = sizeof(vertices) / sizeof(Vertex);
+    glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_BYTE, nullptr);
+    // glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_BYTE, indices);
+
     glDisableVertexAttribArray(positionSlot);
     glDisableVertexAttribArray(colorSlot);
 }
 
-void RenderEngine::updateAnimation(float timeStep) {}
+void RenderEngine::updateAnimation(float timeStep) {
+}
 
 void RenderEngine::onRotate(DeviceOrientation orientation) {
     // float angle = 0;
@@ -93,31 +111,17 @@ void RenderEngine::onRotate(DeviceOrientation orientation) {
     // _currentAngle = angle;
 }
 
-void RenderEngine::applyOrtho(float maxX, float maxY) const {
-    float a = 1.0f / maxX;
-    float b = 1.0f / maxY;
-    float ortho[16] = {
-        a, 0,  0, 0,
-        0, b,  0, 0,
-        0, 0, -1, 0,
-        0, 0,  0, 1
-    };
+void RenderEngine::applyOrtho() const {
+    glm::mat4 ortho = glm::ortho(-1, 1, -1, 1, -1, 1);
+    std::cout << glm::to_string(ortho) << std::endl;
     GLint projectionUniform = glGetUniformLocation(_simpleProgram, "projection");
-    glUniformMatrix4fv(projectionUniform, 1, GL_FALSE, &ortho[0]);
+    glUniformMatrix4fv(projectionUniform, 1, GL_FALSE, glm::value_ptr(ortho));
 }
 
 void RenderEngine::applyRotation(float degrees) const {
-    float radians = degrees * 3.14159f / 180.0f;
-    float s = std::sin(radians);
-    float c = std::cos(radians);
-    float zRotation[16] = {
-         c, s, 0, 0,
-        -s, c, 0, 0,
-         0, 0, 1, 0,
-         0, 0, 0, 1,
-    };
+    auto rotation = glm::rotate(glm::mat4(1.0f), glm::radians(degrees), glm::vec3(0, 0, 1));
     GLint modelViewUniform = glGetUniformLocation(_simpleProgram, "modelView");
-    glUniformMatrix4fv(modelViewUniform, 1, GL_FALSE, &zRotation[0]);
+    glUniformMatrix4fv(modelViewUniform, 1, GL_FALSE, glm::value_ptr(rotation));
 }
 
 GLuint RenderEngine::buildShader(const char *source, GLenum type) const {

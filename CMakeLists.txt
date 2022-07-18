@@ -36,7 +36,13 @@ find_library(CoreGraphics_Lib CoreGraphics)
 
 add_executable(${SAMPLE_NAME} MACOSX_BUNDLE ${Headers} ${Sources} ${Resources})
 
-target_link_libraries(${SAMPLE_NAME} ${UIKit_Lib} ${Foundation_Lib} ${QuartzCore_Lib} ${OpenGLES_Lib} ${CoreGraphics_Lib})
+add_subdirectory(third-party/glm)
+
+target_link_libraries(${SAMPLE_NAME} ${UIKit_Lib} ${Foundation_Lib} ${QuartzCore_Lib} ${OpenGLES_Lib} ${CoreGraphics_Lib}
+    glm
+)
+
+target_include_directories(${SAMPLE_NAME} PUBLIC third-party/stb)
 
 set_target_properties(${SAMPLE_NAME} PROPERTIES
     XCODE_ATTRIBUTE_PROVISIONING_PROFILE_SPECIFIER "ALL"

@@ -23,7 +23,7 @@ public:
     void onRotate(DeviceOrientation orientation) override;
 
 private:
-    void applyOrtho(float maxX, float maxY) const;
+    void applyOrtho() const;
 
     void applyRotation(float degrees) const;
 
@@ -35,6 +35,8 @@ private:
     GLuint _framebuffer;
     GLuint _renderbuffer;
     GLuint _simpleProgram;
-    
+    GLuint _vertexBuffer;
+    GLuint _indexBuffer;
+
     float _currentAngle;
 };
