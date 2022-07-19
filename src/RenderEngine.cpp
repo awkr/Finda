@@ -63,6 +63,7 @@ void RenderEngine::initialize(unsigned int width, unsigned int height) {
 
     // initialize rotation animation state
     onRotate(DeviceOrientation::Portrait);
+    _currentAngle = _desiredAngle;
 }
 
 void RenderEngine::render() const {
@@ -88,6 +89,25 @@ void RenderEngine::render() const {
 }
 
 void RenderEngine::updateAnimation(float timeStep) {
+    float direction = rotationDirection();
+    if (direction == 0) {
+        return;
+    }
+
+    float degrees = timeStep * 360 * RevolutionsPerSecond;
+    _currentAngle += degrees * direction;
+
+    // ensure the angle stays within [0, 360)
+    if (_currentAngle >= 360) {
+        _currentAngle -= 360;
+    } else if (_currentAngle < 0) {
+        _currentAngle += 360;
+    }
+
+    // if the rotation direction changed, then we overshot the desired angle
+    if (rotationDirection() != direction) {
+        _currentAngle = _desiredAngle;
+    }
 }
 
 void RenderEngine::onRotate(DeviceOrientation orientation) {
@@ -103,7 +123,7 @@ void RenderEngine::onRotate(DeviceOrientation orientation) {
             angle = 180;
             break;
     }
-    _currentAngle = angle;
+    _desiredAngle = angle;
 }
 
 void RenderEngine::applyOrtho() const {
@@ -117,6 +137,15 @@ void RenderEngine::applyRotation(float degrees) const {
     auto rotation = glm::rotate(glm::mat4(1.0f), glm::radians(degrees), glm::vec3(0, 0, 1));
     GLint modelViewUniform = glGetUniformLocation(_simpleProgram, "modelView");
     glUniformMatrix4fv(modelViewUniform, 1, GL_FALSE, glm::value_ptr(rotation));
+}
+
+int8_t RenderEngine::rotationDirection() const {
+    float delta = _desiredAngle - _currentAngle;
+    if (delta == 0) {
+        return 0;
+    }
+    bool counterclockwise = ((delta > 0 && delta <= 180) || (delta < -180));
+    return counterclockwise ? 1 : -1;
 }
 
 GLuint RenderEngine::buildShader(const char *source, GLenum type) const {

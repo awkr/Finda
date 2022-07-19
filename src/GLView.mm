@@ -12,6 +12,7 @@
 @implementation GLView {
     EAGLContext *_context;
     IRenderEngine *_renderEngine;
+    CFTimeInterval _timestamp;
 }
 
 - (id)initWithCoder:(NSCoder *)coder {
@@ -30,9 +31,12 @@
 
     _renderEngine = createRenderer();
 
+    // allocate the render buffer's storage
     [_context renderbufferStorage:GL_RENDERBUFFER fromDrawable:eaglLayer];
 
     _renderEngine->initialize(CGRectGetWidth(frame), CGRectGetHeight(frame));
+
+    _timestamp = CACurrentMediaTime();
 
     CADisplayLink *displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(drawView:)];
     [displayLink addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];
@@ -48,6 +52,14 @@
 }
 
 - (void)drawView:(CADisplayLink *)displayLink {
+    if (displayLink) {
+        auto now = displayLink.timestamp;
+        float elapsedSeconds = (float) (now - _timestamp);
+        _timestamp = now;
+
+        _renderEngine->updateAnimation((float) elapsedSeconds);
+    }
+
     _renderEngine->render();
     [_context presentRenderbuffer:GL_RENDERBUFFER];
 }

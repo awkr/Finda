@@ -10,6 +10,8 @@
 #include <OpenGLES/gltypes.h>
 #include "IRenderEngine.hpp"
 
+static const float RevolutionsPerSecond = 1;
+
 class RenderEngine : public IRenderEngine {
 public:
     RenderEngine();
@@ -27,6 +29,8 @@ private:
 
     void applyRotation(float degrees) const;
 
+    int8_t rotationDirection() const;
+
     GLuint buildShader(const char *source, GLenum type) const;
 
     GLuint buildProgram(const char *vertexShaderSource, const char *fragmentShaderSource) const;
@@ -38,5 +42,6 @@ private:
     GLuint _vertexBuffer;
     GLuint _indexBuffer;
 
+    float _desiredAngle;
     float _currentAngle;
 };
