@@ -13,8 +13,8 @@
 #include <glm/gtx/string_cast.hpp>
 #include <iostream>
 #include <OpenGLES/ES3/gl.h>
-#include "SimpleVertexShader.h"
-#include "SimpleFragmentShader.h"
+#include "shaders/Simple.vert.h"
+#include "shaders/Simple.frag.h"
 
 struct Vertex {
     glm::vec2 position;

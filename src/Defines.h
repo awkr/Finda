@@ -7,4 +7,4 @@
 
 #pragma once
 
-#define STRINGIFY(a) #a
+#define STRINGIFY(s) #s

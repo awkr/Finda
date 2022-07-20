@@ -25,7 +25,13 @@ set(MACOSX_BUNDLE_SHORT_VERSION_STRING "1.0")
 set(MACOSX_DEPLOYMENT_TARGET ${DEPLOYMENT_TARGET})
 
 file(GLOB_RECURSE Headers "src/*.h" "src/*.hpp")
+list(FILTER Headers EXCLUDE REGEX "/shaders/")
+
 file(GLOB_RECURSE Sources "src/*.m" "src/*.mm" "src/*.cpp")
+
+file(GLOB_RECURSE Shaders "src/shaders/*.*")
+source_group(Shaders ${CMAKE_SOURCE_DIR} FILES ${Shaders})
+
 file(GLOB_RECURSE Resources "resources/*.storyboard")
 
 find_library(UIKit_Lib UIKit)
@@ -34,7 +40,7 @@ find_library(QuartzCore_Lib QuartzCore)
 find_library(OpenGLES_Lib OpenGLES)
 find_library(CoreGraphics_Lib CoreGraphics)
 
-add_executable(${SAMPLE_NAME} MACOSX_BUNDLE ${Headers} ${Sources} ${Resources})
+add_executable(${SAMPLE_NAME} MACOSX_BUNDLE ${Headers} ${Sources} ${Shaders} ${Resources})
 
 add_subdirectory(third-party/glm)
 
@@ -42,7 +48,7 @@ target_link_libraries(${SAMPLE_NAME} ${UIKit_Lib} ${Foundation_Lib} ${QuartzCore
     glm
 )
 
-target_include_directories(${SAMPLE_NAME} PUBLIC third-party/stb)
+target_include_directories(${SAMPLE_NAME} PUBLIC src third-party/stb)
 
 set_target_properties(${SAMPLE_NAME} PROPERTIES
     XCODE_ATTRIBUTE_PROVISIONING_PROFILE_SPECIFIER "ALL"
