@@ -16,7 +16,7 @@
 #include "shaders/Simple.vert.h"
 #include "shaders/Simple.frag.h"
 
-RenderEngine::RenderEngine() {
+RenderEngine::RenderEngine() : _scale(1) {
     // create & bind the color buffer so that the called can allocate its space
     glGenRenderbuffers(1, &_colorRenderbuffer);
     glBindRenderbuffer(GL_RENDERBUFFER, _colorRenderbuffer);
@@ -113,7 +113,8 @@ void RenderEngine::render() const {
 
     auto translation = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -7.0f));
     auto rotation = glm::mat4_cast(_animation.current);
-    auto modelViewMatrix = translation * rotation;
+    auto scale = glm::scale(glm::mat4(1.0f), glm::vec3(1.0f) * _scale);
+    auto modelViewMatrix = translation * rotation * scale;
 
     auto modelViewUniform = glGetUniformLocation(_simpleProgram, "modelView");
     glUniformMatrix4fv(modelViewUniform, 1, GL_FALSE, glm::value_ptr(modelViewMatrix));
@@ -174,7 +175,8 @@ void RenderEngine::onRotate(DeviceOrientation orientation) {
 
         case DeviceOrientation::FaceUp: {
             direction = glm::vec3(0, 0, 1);
-        } break;
+        }
+            break;
 
         case DeviceOrientation::LandscapeLeft:
             direction = glm::vec3(1, 0, 0);
@@ -221,6 +223,17 @@ GLuint RenderEngine::buildProgram(const char *vertexShaderSource, const char *fr
         exit(EXIT_FAILURE);
     }
     return handle;
+}
+
+void RenderEngine::onFingerUp(const glm::vec2 &location) {
+    _scale = 1;
+}
+
+void RenderEngine::onFingerDown(const glm::vec2 &location) {
+    _scale = 1.05;
+}
+
+void RenderEngine::onFingerMove(const glm::vec2 &from, const glm::vec2 &to) {
 }
 
 IRenderEngine *createRenderer() {

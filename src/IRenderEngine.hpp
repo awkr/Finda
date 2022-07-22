@@ -7,6 +7,8 @@
 
 #pragma once
 
+#include <glm/glm.hpp>
+
 enum class DeviceOrientation {
     Unknown,
     Portrait,
@@ -26,6 +28,12 @@ struct IRenderEngine {
     virtual void updateAnimation(float timeStep) = 0;
 
     virtual void onRotate(DeviceOrientation orientation) = 0;
+
+    virtual void onFingerUp(const glm::vec2 &location) = 0;
+
+    virtual void onFingerDown(const glm::vec2 &location) = 0;
+
+    virtual void onFingerMove(const glm::vec2 &from, const glm::vec2 &to) = 0;
 
     virtual ~IRenderEngine() {
     }

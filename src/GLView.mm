@@ -70,6 +70,23 @@
     [self drawView:nil];
 }
 
+- (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
+    CGPoint location = [touches.anyObject locationInView:self];
+    _renderEngine->onFingerDown({location.x, location.y});
+}
+
+- (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
+    CGPoint location = [touches.anyObject locationInView:self];
+    _renderEngine->onFingerUp({location.x, location.y});
+}
+
+- (void)touchesMoved:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
+    UITouch *touch = [touches anyObject];
+    CGPoint previous = [touch previousLocationInView:self];
+    CGPoint current = [touch locationInView:self];
+    _renderEngine->onFingerMove({previous.x, previous.y}, {current.x, current.y});
+}
+
 + (Class)layerClass {
     return [CAEAGLLayer class];
 }

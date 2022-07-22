@@ -9,7 +9,6 @@
 
 #include <OpenGLES/gltypes.h>
 #include "IRenderEngine.hpp"
-#include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <vector>
 
@@ -41,6 +40,12 @@ public:
 
     void onRotate(DeviceOrientation orientation) override;
 
+    void onFingerUp(const glm::vec2 &location) override;
+
+    void onFingerDown(const glm::vec2 &location) override;
+
+    void onFingerMove(const glm::vec2 &from, const glm::vec2 &to) override;
+
 private:
     GLuint buildShader(const char *source, GLenum type) const;
 
@@ -56,6 +61,7 @@ private:
 
     float _desiredAngle;
     float _currentAngle;
+    float _scale;
 
     std::vector<Vertex> _cone;
     std::vector<Vertex> _disk;
