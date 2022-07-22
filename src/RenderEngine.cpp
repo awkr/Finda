@@ -7,145 +7,187 @@
 
 #include "RenderEngine.hpp"
 #include <cmath>
-#include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
+#include <glm/gtx/quaternion.hpp>
 #include <glm/gtx/string_cast.hpp>
+#include <glm/gtc/type_ptr.hpp>
 #include <iostream>
 #include <OpenGLES/ES3/gl.h>
 #include "shaders/Simple.vert.h"
 #include "shaders/Simple.frag.h"
 
-struct Vertex {
-    glm::vec2 position;
-    glm::vec4 color;
-};
-
-// clang-format off
-const Vertex vertices[3] = {
-        {{-0.5, -0.5}, {  1,   0, 0, 1}},
-        {{ 0.5, -0.5}, {  0,   1, 0, 1}},
-        {{   0,  0.5}, {  0,   0, 1, 1}},
-};
-
-GLubyte indices[3] = {0, 1, 2};
-// clang-format on
-
 RenderEngine::RenderEngine() {
-    glGenRenderbuffers(1, &_renderbuffer);
-    glBindRenderbuffer(GL_RENDERBUFFER, _renderbuffer);
+    // create & bind the color buffer so that the called can allocate its space
+    glGenRenderbuffers(1, &_colorRenderbuffer);
+    glBindRenderbuffer(GL_RENDERBUFFER, _colorRenderbuffer);
 }
 
 void RenderEngine::initialize(unsigned int width, unsigned int height) {
-    // create the framebuffer object and attach the color buffer
+    const float coneRadius = 0.5f;
+    const float coneHeight = 1.866f;
+    const int coneSlices = 40;
+
+    {
+        // Allocate space for the cone vertices.
+        _cone.resize((coneSlices + 1) * 2);
+
+        // Initialize the vertices of the triangle strip.
+        std::vector<Vertex>::iterator vertex = _cone.begin();
+        const float d = glm::two_pi<float>() / coneSlices;
+        for (float theta = 0; vertex != _cone.end(); theta += d) {
+            // Grayscale gradient
+            float brightness = abs(sin(theta));
+            glm::vec4 color(brightness, brightness, brightness, 1);
+
+            // Apex vertex
+            vertex->position = {0, 1, 0};
+            vertex->color = color;
+            vertex++;
+
+            // Rim vertex
+            vertex->position = {coneRadius * cos(theta), 1 - coneHeight, coneRadius * sin(theta)};
+            vertex->color = color;
+            vertex++;
+        }
+    }
+
+    {
+        // Allocate space for the disk vertices.
+        _disk.resize(coneSlices + 2);
+
+        // Initialize the center vertex of the triangle fan.
+        std::vector<Vertex>::iterator vertex = _disk.begin();
+        vertex->position = {0, 1 - coneHeight, 0};
+        vertex->color = {0.75, 0.75, 0.75, 1};
+        vertex++;
+
+        // Initialize the rim vertices of the triangle fan.
+        const float d = glm::two_pi<float>() / coneSlices;
+        for (float theta = 0; vertex != _disk.end(); theta += d) {
+            vertex->position = {coneRadius * cos(theta), 1 - coneHeight, coneRadius * sin(theta)};
+            vertex->color = {0.75, 0.75, 0.75, 1};
+            vertex++;
+        }
+    }
+
+    // create the depth buffer
+    glGenRenderbuffers(1, &_depthRenderbuffer);
+    glBindRenderbuffer(GL_RENDERBUFFER, _depthRenderbuffer);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT16, width, height);
+
+    // create the framebuffer object; attach the color and depth buffers
     glGenFramebuffers(1, &_framebuffer);
     glBindFramebuffer(GL_FRAMEBUFFER, _framebuffer);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, _renderbuffer);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, _colorRenderbuffer);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, _depthRenderbuffer);
 
-    // create VBO for the vertices
-    glGenBuffers(1, &_vertexBuffer);
-    glBindBuffer(GL_ARRAY_BUFFER, _vertexBuffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    // bind the color buffer for rendering
+    glBindRenderbuffer(GL_RENDERBUFFER, _colorRenderbuffer);
 
-    // create VBO for the indices
-    glGenBuffers(1, &_indexBuffer);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _indexBuffer);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+    // set up some GL states
+    glViewport(0, 0, width, height); // 414 896
+    glEnable(GL_DEPTH_TEST);
 
-    glViewport(0, 0, width, height);
-
+    // build the GLSL program
     _simpleProgram = buildProgram(SimpleVertexShader, SimpleFragmentShader);
 
     glUseProgram(_simpleProgram);
 
-    // initialize the projection matrix
-    applyOrtho();
-
-    // initialize rotation animation state
-    onRotate(DeviceOrientation::Portrait);
-    _currentAngle = _desiredAngle;
+    // set the projection matrix
+    auto projectionUniform = glGetUniformLocation(_simpleProgram, "projection");
+    auto projectionMatrix = glm::frustum(-2.07f * .5f, 2.07f * .5f, -4.48f * .5f, 4.48f * .5f, 5.0f, 10.0f);
+    glUniformMatrix4fv(projectionUniform, 1, GL_FALSE, glm::value_ptr(projectionMatrix));
 }
 
 void RenderEngine::render() const {
     glClearColor(255.0f / 255.0f, 149.0f / 255.0f, 10.0f / 255.0f, 1.0f); // orange color
-    glClear(GL_COLOR_BUFFER_BIT);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    applyRotation(_currentAngle);
-
-    auto positionSlot = glGetAttribLocation(_simpleProgram, "position");
-    auto colorSlot = glGetAttribLocation(_simpleProgram, "color");
+    auto positionSlot = (GLuint) glGetAttribLocation(_simpleProgram, "position");
+    auto colorSlot = (GLuint) glGetAttribLocation(_simpleProgram, "color");
 
     glEnableVertexAttribArray(positionSlot);
     glEnableVertexAttribArray(colorSlot);
 
-    GLsizei stride = sizeof(Vertex);
-    glVertexAttribPointer(positionSlot, 2, GL_FLOAT, GL_FALSE, stride, (GLvoid *) offsetof(Vertex, position));
-    glVertexAttribPointer(colorSlot, 4, GL_FLOAT, GL_FALSE, stride, (GLvoid *) offsetof(Vertex, color));
+    // set the model-view matrix
 
-    glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_BYTE, nullptr);
+    auto translation = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -7.0f));
+    auto rotation = glm::mat4_cast(_animation.current);
+    auto modelViewMatrix = translation * rotation;
+
+    auto modelViewUniform = glGetUniformLocation(_simpleProgram, "modelView");
+    glUniformMatrix4fv(modelViewUniform, 1, GL_FALSE, glm::value_ptr(modelViewMatrix));
+
+    {
+        // draw the cone
+        GLsizei stride = sizeof(Vertex);
+        const GLvoid *pCoords = &_cone[0].position.x;
+        const GLvoid *pColors = &_cone[0].color.x;
+        glVertexAttribPointer(positionSlot, 3, GL_FLOAT, GL_FALSE, stride, pCoords);
+        glVertexAttribPointer(colorSlot, 4, GL_FLOAT, GL_FALSE, stride, pColors);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, (GLsizei) _cone.size());
+    }
+
+    {
+        // draw the disk that caps off the base of the cone
+        GLsizei stride = sizeof(Vertex);
+        const GLvoid *pCoords = &_disk[0].position.x;
+        const GLvoid *pColors = &_disk[0].color.x;
+        glVertexAttribPointer(positionSlot, 3, GL_FLOAT, GL_FALSE, stride, pCoords);
+        glVertexAttribPointer(colorSlot, 4, GL_FLOAT, GL_FALSE, stride, pColors);
+        glDrawArrays(GL_TRIANGLE_FAN, 0, (GLsizei) _disk.size());
+    }
 
     glDisableVertexAttribArray(positionSlot);
     glDisableVertexAttribArray(colorSlot);
 }
 
 void RenderEngine::updateAnimation(float timeStep) {
-    float direction = rotationDirection();
-    if (direction == 0) {
+    if (_animation.current == _animation.end) {
         return;
     }
 
-    float degrees = timeStep * 360 * RevolutionsPerSecond;
-    _currentAngle += degrees * direction;
-
-    // ensure the angle stays within [0, 360)
-    if (_currentAngle >= 360) {
-        _currentAngle -= 360;
-    } else if (_currentAngle < 0) {
-        _currentAngle += 360;
-    }
-
-    // if the rotation direction changed, then we overshot the desired angle
-    if (rotationDirection() != direction) {
-        _currentAngle = _desiredAngle;
+    _animation.elapsed += timeStep;
+    if (_animation.elapsed >= AnimationDuration) {
+        _animation.current = _animation.end;
+    } else {
+        float factor = _animation.elapsed / AnimationDuration;
+        _animation.current = glm::slerp(_animation.start, _animation.end, factor);
     }
 }
 
 void RenderEngine::onRotate(DeviceOrientation orientation) {
-    float angle = 0;
+    glm::vec3 direction;
     switch (orientation) {
-        case DeviceOrientation::LandscapeLeft:
-            angle = 270;
+        case DeviceOrientation::Unknown:
+        case DeviceOrientation::Portrait:
+            direction = glm::vec3(0, 1, 0);
             break;
-        case DeviceOrientation::LandscapeRight:
-            angle = 90;
-            break;
+
         case DeviceOrientation::PortraitUpsideDown:
-            angle = 180;
+            direction = glm::vec3(0, -1, 0);
+            break;
+
+        case DeviceOrientation::FaceDown:
+            direction = glm::vec3(0, 0, -1);
+            break;
+
+        case DeviceOrientation::FaceUp: {
+            direction = glm::vec3(0, 0, 1);
+        } break;
+
+        case DeviceOrientation::LandscapeLeft:
+            direction = glm::vec3(1, 0, 0);
+            break;
+
+        case DeviceOrientation::LandscapeRight:
+            direction = glm::vec3(-1, 0, 0);
             break;
     }
-    _desiredAngle = angle;
-}
 
-void RenderEngine::applyOrtho() const {
-    glm::mat4 ortho = glm::ortho(-1, 1, -1, 1, -1, 1);
-    std::cout << glm::to_string(ortho) << std::endl;
-    GLint projectionUniform = glGetUniformLocation(_simpleProgram, "projection");
-    glUniformMatrix4fv(projectionUniform, 1, GL_FALSE, glm::value_ptr(ortho));
-}
-
-void RenderEngine::applyRotation(float degrees) const {
-    auto rotation = glm::rotate(glm::mat4(1.0f), glm::radians(degrees), glm::vec3(0, 0, 1));
-    GLint modelViewUniform = glGetUniformLocation(_simpleProgram, "modelView");
-    glUniformMatrix4fv(modelViewUniform, 1, GL_FALSE, glm::value_ptr(rotation));
-}
-
-int8_t RenderEngine::rotationDirection() const {
-    float delta = _desiredAngle - _currentAngle;
-    if (delta == 0) {
-        return 0;
-    }
-    bool counterclockwise = ((delta > 0 && delta <= 180) || (delta < -180));
-    return counterclockwise ? 1 : -1;
+    _animation.elapsed = 0;
+    _animation.start = _animation.current = _animation.end;
+    _animation.end = glm::rotation({0, 1, 0}, direction);
 }
 
 GLuint RenderEngine::buildShader(const char *source, GLenum type) const {

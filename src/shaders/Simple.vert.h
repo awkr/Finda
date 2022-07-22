@@ -11,14 +11,14 @@
 
 const char *SimpleVertexShader = STRINGIFY(
 
-    attribute vec4 position;
+    attribute vec3 position;
     attribute vec4 color;
     varying lowp vec4 destinationColor;
     uniform mat4 projection;
     uniform mat4 modelView;
 
     void main() {
-        gl_Position = projection * modelView * position;
+        gl_Position = projection * modelView * vec4(position, 1);
         destinationColor = color;
     }
 
