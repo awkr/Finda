@@ -26,48 +26,56 @@ void RenderEngine::initialize(unsigned int width, unsigned int height) {
     const float coneRadius = 0.5f;
     const float coneHeight = 1.866f;
     const int coneSlices = 40;
+    const float d = glm::two_pi<float>() / coneSlices;
+    const int vertexCount = coneSlices * 2 + 1;
 
-    {
-        // Allocate space for the cone vertices.
-        _cone.resize((coneSlices + 1) * 2);
+    // Vertex generation
 
-        // Initialize the vertices of the triangle strip.
-        std::vector<Vertex>::iterator vertex = _cone.begin();
-        const float d = glm::two_pi<float>() / coneSlices;
-        for (float theta = 0; vertex != _cone.end(); theta += d) {
-            // Grayscale gradient
-            float brightness = abs(sin(theta));
-            glm::vec4 color(brightness, brightness, brightness, 1);
+    _coneVertices.resize(vertexCount);
+    std::vector<Vertex>::iterator vertex = _coneVertices.begin();
 
-            // Apex vertex
-            vertex->position = {0, 1, 0};
-            vertex->color = color;
-            vertex++;
+    // Cone's body
+    for (float theta = 0; vertex != _coneVertices.end() - 1; theta += d) {
+        // Grayscale gradient
+        float brightness = abs(sin(theta));
+        glm::vec4 color(brightness, brightness, brightness, 1);
 
-            // Rim vertex
-            vertex->position = {coneRadius * cos(theta), 1 - coneHeight, coneRadius * sin(theta)};
-            vertex->color = color;
-            vertex++;
-        }
-    }
-
-    {
-        // Allocate space for the disk vertices.
-        _disk.resize(coneSlices + 2);
-
-        // Initialize the center vertex of the triangle fan.
-        std::vector<Vertex>::iterator vertex = _disk.begin();
-        vertex->position = {0, 1 - coneHeight, 0};
-        vertex->color = {0.75, 0.75, 0.75, 1};
+        // Apex vertex
+        vertex->position = {0, 1, 0};
+        vertex->color = color;
         vertex++;
 
-        // Initialize the rim vertices of the triangle fan.
-        const float d = glm::two_pi<float>() / coneSlices;
-        for (float theta = 0; vertex != _disk.end(); theta += d) {
-            vertex->position = {coneRadius * cos(theta), 1 - coneHeight, coneRadius * sin(theta)};
-            vertex->color = {0.75, 0.75, 0.75, 1};
-            vertex++;
-        }
+        // Rim vertex
+        vertex->position = {coneRadius * cos(theta), 1 - coneHeight, coneRadius * sin(theta)};
+        vertex->color = color;
+        vertex++;
+    }
+
+    // Disk center
+    vertex->position = {0, 1 - coneHeight, 0};
+    vertex->color = {0.75, 0.75, 0.75, 1};
+
+    // Index generation
+
+    _bodyIndexCount = coneSlices * 3;
+    _diskIndexCount = coneSlices * 3;
+
+    _coneIndices.resize(_bodyIndexCount + _diskIndexCount);
+    std::vector<GLubyte>::iterator index = _coneIndices.begin();
+
+    // Body triangles
+    for (uint8_t i = 0; i < coneSlices * 2; i += 2) {
+        *index++ = i;
+        *index++ = (i + 1) % (2 * coneSlices);
+        *index++ = (i + 3) % (2 * coneSlices);
+    }
+
+    // Disk triangles
+    const int diskCenterIndex = vertexCount - 1;
+    for (uint8_t i = 1; i < coneSlices * 2 + 1; i += 2) {
+        *index++ = diskCenterIndex;
+        *index++ = i;
+        *index++ = (i + 2) % (2 * coneSlices);
     }
 
     // create the depth buffer

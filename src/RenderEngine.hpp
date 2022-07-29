@@ -63,7 +63,9 @@ private:
     float _currentAngle;
     float _scale;
 
-    std::vector<Vertex> _cone;
-    std::vector<Vertex> _disk;
+    std::vector<Vertex> _coneVertices;
+    std::vector<GLubyte> _coneIndices;
+    uint16_t _bodyIndexCount;
+    uint16_t _diskIndexCount;
     Animation _animation;
 };
