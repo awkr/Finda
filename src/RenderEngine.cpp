@@ -31,11 +31,11 @@ void RenderEngine::initialize(unsigned int width, unsigned int height) {
 
     // Vertex generation
 
-    _coneVertices.resize(vertexCount);
-    std::vector<Vertex>::iterator vertex = _coneVertices.begin();
+    std::vector<Vertex> coneVertices(vertexCount);
+    std::vector<Vertex>::iterator vertex = coneVertices.begin();
 
     // Cone's body
-    for (float theta = 0; vertex != _coneVertices.end() - 1; theta += d) {
+    for (float theta = 0; vertex != coneVertices.end() - 1; theta += d) {
         // Grayscale gradient
         float brightness = abs(sin(theta));
         glm::vec4 color(brightness, brightness, brightness, 1);
@@ -60,8 +60,8 @@ void RenderEngine::initialize(unsigned int width, unsigned int height) {
     _bodyIndexCount = coneSlices * 3;
     _diskIndexCount = coneSlices * 3;
 
-    _coneIndices.resize(_bodyIndexCount + _diskIndexCount);
-    std::vector<GLubyte>::iterator index = _coneIndices.begin();
+    std::vector<GLubyte> coneIndices(_bodyIndexCount + _diskIndexCount);
+    std::vector<GLubyte>::iterator index = coneIndices.begin();
 
     // Body triangles
     for (uint8_t i = 0; i < coneSlices * 2; i += 2) {
@@ -105,6 +105,16 @@ void RenderEngine::initialize(unsigned int width, unsigned int height) {
     auto projectionUniform = glGetUniformLocation(_simpleProgram, "projection");
     auto projectionMatrix = glm::frustum(-2.07f * .5f, 2.07f * .5f, -4.48f * .5f, 4.48f * .5f, 5.0f, 10.0f);
     glUniformMatrix4fv(projectionUniform, 1, GL_FALSE, glm::value_ptr(projectionMatrix));
+
+    // Create the VBO for the vertices
+    glGenBuffers(1, &_vertexBuffer);
+    glBindBuffer(GL_ARRAY_BUFFER, _vertexBuffer);
+    glBufferData(GL_ARRAY_BUFFER, coneVertices.size() * sizeof(Vertex), coneVertices.data(), GL_STATIC_DRAW);
+
+    // Create the VBO for the indices
+    glGenBuffers(1, &_indexBuffer);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _indexBuffer);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, coneIndices.size() * sizeof(GLubyte), coneIndices.data(), GL_STATIC_DRAW);
 }
 
 void RenderEngine::render() const {
@@ -127,25 +137,17 @@ void RenderEngine::render() const {
     auto modelViewUniform = glGetUniformLocation(_simpleProgram, "modelView");
     glUniformMatrix4fv(modelViewUniform, 1, GL_FALSE, glm::value_ptr(modelViewMatrix));
 
-    {
-        // draw the cone
-        GLsizei stride = sizeof(Vertex);
-        const GLvoid *pCoords = &_cone[0].position.x;
-        const GLvoid *pColors = &_cone[0].color.x;
-        glVertexAttribPointer(positionSlot, 3, GL_FLOAT, GL_FALSE, stride, pCoords);
-        glVertexAttribPointer(colorSlot, 4, GL_FLOAT, GL_FALSE, stride, pColors);
-        glDrawArrays(GL_TRIANGLE_STRIP, 0, (GLsizei) _cone.size());
-    }
+    glBindBuffer(GL_ARRAY_BUFFER, _vertexBuffer);
+    GLsizei stride = sizeof(Vertex);
+    glVertexAttribPointer(positionSlot, 3, GL_FLOAT, GL_FALSE, stride, nullptr);
+    glVertexAttribPointer(colorSlot, 4, GL_FLOAT, GL_FALSE, stride, (GLvoid *) offsetof(Vertex, color));
 
-    {
-        // draw the disk that caps off the base of the cone
-        GLsizei stride = sizeof(Vertex);
-        const GLvoid *pCoords = &_disk[0].position.x;
-        const GLvoid *pColors = &_disk[0].color.x;
-        glVertexAttribPointer(positionSlot, 3, GL_FLOAT, GL_FALSE, stride, pCoords);
-        glVertexAttribPointer(colorSlot, 4, GL_FLOAT, GL_FALSE, stride, pColors);
-        glDrawArrays(GL_TRIANGLE_FAN, 0, (GLsizei) _disk.size());
-    }
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _indexBuffer);
+
+    const GLvoid *bodyOffset = 0;
+    const auto diskOffset = (GLvoid *) (size_t) _bodyIndexCount;
+    glDrawElements(GL_TRIANGLES, _bodyIndexCount, GL_UNSIGNED_BYTE, bodyOffset);
+    glDrawElements(GL_TRIANGLES, _diskIndexCount, GL_UNSIGNED_BYTE, diskOffset);
 
     glDisableVertexAttribArray(positionSlot);
     glDisableVertexAttribArray(colorSlot);
